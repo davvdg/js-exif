@@ -15,25 +15,42 @@ define([], function() {
         parseDocument(xml);
     }
     
+    var otherRequest = 0;
+    
+    var parsedPage = {};
+    
+    var mainPage = "EXIF.html";
     xhr.addEventListener("load", onLoad);
-    xhr.open("GET", "ressources/EXIFTags.html", true );
+    xhr.open("GET", "ressources/"+mainPage, true );
     xhr.responseType = "document";
     xhr.send();    
     
     var parseDocument = function(xml) {
+        
+        var xph = "//html/body/blockquote[1]/table/tbody/tr/td/table/tbody/tr[@class='h']/th";
+        var xphres = xml.evaluate(xph, xml.documentElement, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
+        console.log(xphres);
+        var vcol = 4;
+        if (xphres){
+            for (var i =0; i<xphres.snapshotLength; i++) {
+                if (xphres.snapshotItem(i).textContent === "Values / Notes") {
+                    vcol = i;
+                }
+            }
+        }            
         
         var xp = "//html/body/blockquote[1]/table/tbody/tr/td/table/tbody/tr[not(@class) or @class!='h']";
         //var xp = "//html/body/blockquote/table/tbody/tr/td/table/tbody/tr";
         var xprowsres = xml.evaluate(xp, xml.documentElement, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
         if (xprowsres){
             for (var i =0; i<xprowsres.snapshotLength; i++) {
-                parseRow(xml, xprowsres.snapshotItem(i));
+                parseRow(xml, xprowsres.snapshotItem(i), vcol);
             }
         }             
 
     }
     
-    var parseRow = function(xml, node) {
+    var parseRow = function(xml, node, vCol) {
         
         var xpTagNames = "td[2]//text()[normalize-space()]";
         var doc = node.ownerDocument;
@@ -68,7 +85,7 @@ define([], function() {
                     ifds[ifd] = ifdn;
                 }
                 
-                var values = parseValue(node);
+                var values = parseValue(node, vCol);
                 
                 var tag = {
                     id: node.childNodes[1].textContent, 
@@ -82,19 +99,68 @@ define([], function() {
             }
         }
     }
+
+    var parseRowSimple = function(nodei, vCol, ifd) {
+        //console.log(nodei);
+        var xpTagNames = "td[2]//text()[normalize-space()]";
+        var doc = nodei.ownerDocument;
+        //console.log(doc);
+        var xpTagNamesRes = doc.evaluate(xpTagNames, nodei, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
+
+        var ifdn;
+        if (ifds[ifd]) {
+            ifdn = ifds[ifd];
+        } else {
+            ifdn = {ifd: ifd, tags: []};
+            ifds[ifd] = ifdn;
+        }
+
+        var values = parseValue(nodei, vCol);
+
+        var tag = {
+            id: nodei.childNodes[1].textContent, 
+            idn: parseInt(nodei.childNodes[1].textContent,16),
+            tagName: xpTagNamesRes.snapshotItem(0).nodeValue,
+            ifd: ifdn,
+            values: values
+        };
+        ifdn.tags.push(tag);
+    };
     
-    var parseValue= function(node) {
+    
+    
+    var parseValue= function(node, vCol) {
         
         var values = {};
         var doc = node.ownerDocument;
-        var xpref = "td[5]/a[@href]";        
+        var xpref = "td["+(vCol+1)+"]/a[@href]";        
         var xpres = doc.evaluate(xpref, node, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
         if (xpres){
             if (xpres.snapshotLength > 0) {
-                
-                var key = xpres.snapshotItem(0).getAttribute("href").split("#")[1];
-                //console.log(" jump to get attributes ");                
-                values = parseExtraValues(node, key);
+                //console.log("extra values");
+                var splitURL = xpres.snapshotItem(0).getAttribute("href").split("#")
+                var key = splitURL[1];
+                var page = splitURL[0];
+                if (page === mainPage) {
+                    values = parseExtraValues(node, key);
+                } else {
+                    
+                    var pageL = page.split("/");
+                    var cpage = pageL[pageL.length-1];
+                    if (!parsedPage[cpage]) {
+                        console.log(cpage);
+                        
+                        parsedPage[cpage]= true;
+                        var bim = new XMLHttpRequest();
+                        bim.open("GET", "ressources/"+cpage, true );
+                        bim.addEventListener("load", onLoadExtra);
+                        bim.addEventListener("error", onErrorExtra);                        
+                        bim.responseType = "document";
+                        otherRequest += 1;
+                        bim.send();
+                    }
+    
+                }
                 
                 
 
@@ -145,6 +211,48 @@ define([], function() {
         }
         return values;        
     }
+    var onErrorExtra = function(event) {
+        
+        otherRequest -=1;
+        //console.log(otherRequest);
+
+        checkDoc();
+    }
+    var onLoadExtra = function(event) {
+        var pagL = event.currentTarget.response.URL.split("/");
+        otherRequest -=1;
+        if (pagL.slice(-1)[0] === "GPS.html") {
+            
+            var target = event.currentTarget;
+            //console.log(event);
+
+            var xml2 = target.response;
+            parseExtraDocs(xml2, "GPS");
+            checkDoc();
+        }
+        
+    }
+    var checkDoc = function() {
+        if (otherRequest === 0) {
+            //console.log(ifds);
+        }
+    }
+    var parseExtraDocs = function(xmli, ifd) {
+        var doc = xmli;
+        var values = {};
+        var xp = "//html/body/blockquote[1]/table/tbody/tr/td/table/tbody/tr[not(@class) or @class!='h']";
+        //var xp = "//html/body/blockquote/table/tbody/tr/td/table/tbody/tr";
+        var xprowsres = xmli.evaluate(xp, xmli.documentElement, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
+        if (xprowsres) {
+            for (var i = 0; i < xprowsres.snapshotLength; i++) {
+                //console.log(xprowsres.snapshotItem(i));
+                parseRowSimple(xprowsres.snapshotItem(i), 3, ifd);
+            }
+        }
+    }
+    
+    
+    
     
     return {
         tags:tags,
