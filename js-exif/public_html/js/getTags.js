@@ -14,7 +14,7 @@ requirejs.config({
 
 requirejs(["js-exif"], function(t) {
     var xhr = new XMLHttpRequest();
-    xhr.open("GET", "ressources/IMG_0394.JPG", true);
+    xhr.open("GET", "ressources/vosges_xmp.jpg", true);
     xhr.responseType = "arraybuffer";
 
     

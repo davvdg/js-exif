@@ -47,7 +47,6 @@ define([], function() {
                 parseRow(xml, xprowsres.snapshotItem(i), vcol);
             }
         }             
-
     }
     
     var parseRow = function(xml, node, vCol) {
@@ -138,9 +137,10 @@ define([], function() {
         if (xpres){
             if (xpres.snapshotLength > 0) {
                 //console.log("extra values");
-                var splitURL = xpres.snapshotItem(0).getAttribute("href").split("#")
+                var splitURL = xpres.snapshotItem(0).getAttribute("href").split("#");
                 var key = splitURL[1];
-                var page = splitURL[0];
+                var page = splitURL[0].split("/").splice(-1)[0];
+                console.log(page);
                 if (page === mainPage) {
                     values = parseExtraValues(node, key);
                 } else {
@@ -187,7 +187,8 @@ define([], function() {
                 for (var i =0; i< xpvalsres.snapshotLength; i++) {
                     var val = xpvalsres.snapshotItem(i).nodeValue.split("=");
                     if (val[0] !== undefined && val[1] !== undefined) {
-                        values[val[0].trimRight()]=val[1].replace("\n", '').trim();
+                        val[0] = parseInt(val[0] );
+                        values[val[0]]=val[1].replace("\n", '').trim();
                     }
                 }
             }
@@ -202,9 +203,16 @@ define([], function() {
         var xpExtra = "//html/body/h2[a[@name='"+tableName+"']]/following::table[1]/tbody/tr/td/table/tbody/tr[not(@class) or @class!='h']";
         //var xp = "//html/body/blockquote/table/tbody/tr/td/table/tbody/tr";
         var xpExtraRes = doc.evaluate(xpExtra, doc.documentElement, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
-        if (xpExtraRes){
+        if (xpExtraRes) {
             for (var i =0; i<xpExtraRes.snapshotLength; i++) {
+                var re = new RegExp("0x[0-9A-Fa-f]*");
                 var key = xpExtraRes.snapshotItem(i).childNodes[0].textContent.trimRight();
+                if (key.match(re)!==null) {
+                    key = parseInt(key);
+                                    console.log(key);
+
+                }
+                
                 var val = xpExtraRes.snapshotItem(i).childNodes[1].textContent;
                 values[key] = val.replace("= ", '');
             }
