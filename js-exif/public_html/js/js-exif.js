@@ -376,9 +376,6 @@ denominator.
     };
     StreamData.prototype = {
         serialize: function(dataStream, offset) {
-            console.log(dataStream.byteLength);
-            console.log(offset);
-            console.log(this.end - this.start);
             var dvOut = new DataView(dataStream, offset, this.end - this.start);
             var dvIn = new DataView(this.dataStream, this.start, this.end - this.start);
             for (var i=0; i<this.end - this.start; i++) {
@@ -406,7 +403,6 @@ denominator.
         }
         var offset = 2;
         this.markers = [];
-        console.log(this.dataStream.byteLength);
         while (offset < this.dataStream.byteLength) {
             var marker = new Marker();
             marker.deserialize(this.dataStream, offset);
@@ -431,7 +427,7 @@ denominator.
         save: function() {
             var size = 2;
             for (var i=0; i< this.markers.length; i++) {
-                size += this.markers[i].computeMarkerSize();
+                size += this.markers[i].computeMarkerSize() +2;
             }
             size += 2;
             size += this.raw.end - this.raw.start;
@@ -444,13 +440,13 @@ denominator.
             for (var i=0; i< this.markers.length; i++) {
                 var size = this.markers[i].computeMarkerSize();
                 this.markers[i].serialize(dataStream, offset);
-                offset += size;
+                offset += size +2;
             }
             this.raw.serialize(dataStream, offset);
             var dv = new DataView(dataStream, this.raw.markerEnd, 2);
-            dv.setUint16(0, 65497);
-            console.log(this.raw.markerEnd);
-            var dv = new DataView(dataStream, 0, 12);
+            
+            dv.setUint16(0, 65497); //EOI
+            
             return _arrayBufferToBase64(dataStream);
         }
     
