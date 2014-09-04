@@ -37,7 +37,7 @@ requirejs(["js-exif"], function(t) {
     xhr1.url = "IMG_0394";
     xhr1.responseType = "arraybuffer";    
     xhr1.addEventListener("load", onload);
-    //xhr1.send();    
+    xhr1.send();    
     var xhr2 = new XMLHttpRequest();
     xhr2.open("GET", "ressources/vosges_xmp.jpg", true);
     xhr2.url = "vosges_xmp";
@@ -50,6 +50,6 @@ requirejs(["js-exif"], function(t) {
     
     xhr3.responseType = "arraybuffer";    
     xhr3.addEventListener("load", onload);
-    xhr3.send();    
+    //xhr3.send();    
     
 });

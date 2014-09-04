@@ -101,10 +101,112 @@ denominator.
                 var v = dvIn.getUint8(i);
                 dvOut.setUint8(i, v);                
             }            
-        },
+        }
     };
 
-    var App1 = function(marker) {
+    var TiffHeader = function() {
+        this.ifds = [];
+    };
+    TiffHeader.prototype = {
+        deserialize: function(dataStream, offset) { // this offset is the start off the tiff header from the start of the file
+            var dv = new DataView(dataStream, offset, 8); // 2 + 2 + 4
+            var byteOrder = decodeString(dv, 0, 2);
+            if (byteOrder === "MM") {
+                this.le = false;
+            } else if (byteOrder === "II") {
+                this.le = true;
+            } else {
+                throw "cannot detect endianess";
+            }
+            if (dv.getUint16(2,this.le) !== 42) throw "cannot find 42";
+            this.idf0OffsetFromTiffH = dv.getUint32(4, this.le); // start idf0 + start tiff header
+            /*
+            this.ifd0 = new Ifd();
+
+            this.ifd0.name = "IFD0";
+            this.ifd0.deserialize(dataStream, this.idf0OffsetFromTiffH, this.startOfTiffHeader + this.idf0OffsetFromTiffH);                
+            var ExifIFDoffset = this.ifd0.getTagByName("ExifOffset");
+            if (ExifIFDoffset !== undefined) {
+                var Exifidf0p = new Ifd();
+                Exifidf0p.name = "ExifIFD";
+                Exifidf0p.deserialize(dataStream, ExifIFDoffset.value, ExifIFDoffset.value + this.startOfTiffHeader);
+                console.log(Exifidf0p);
+            }                
+            if (this.ifd0.nextIFDOffset !== 0) {
+                var idf1p = new Ifd();
+                idf1p.name = "IFD1";
+                idf1p.deserialize(dataStream, this.ifd0.nextIFDOffset, this.ifd0.nextIFDOffset + this.startOfTiffHeader);
+                console.log(idf1p);
+            }
+            var GPSoffset = this.ifd0.getTagByName("GPSInfo");
+            if (GPSoffset !== undefined) {
+                var GPSp = new Ifd();
+                GPSp.name = "GPS";
+                GPSp.deserialize(dataStream, GPSoffset.value, GPSoffset.value + this.startOfTiffHeader);
+                console.log(GPSp);
+            }
+            */
+
+        },
+        serialize: function(dataStream, offset) {
+            var dv = new DataView(dataStream, offset, 8);
+            if (this.le) {
+                writeHex(dv, 0, "4D4D");
+            } else {
+                writeHex(dv, 0, "4D4D");
+            }
+            dv.setUint16(2, 42, this.le);
+            for (var i=0; i < this.ifds.length; i++) {
+                var size = this.ifds[i].computeSize();
+                this.ifds.serialize();
+                offset += size;
+            }
+            return offset;
+        },
+        
+    };
+
+
+    var App1Exif = function(marker) {
+        if (marker) {
+            this.markerStart = marker.markerStart;
+            this.markerType = marker.markerType;
+            this.markerTypeHex = marker.markerTypeHex;
+            this.markerSize = marker.markerSize;
+            this.markerEnd = marker.markerEnd;
+            this.deserialize(marker.deserializeDS, this.markerStart + 10);
+        } else {
+            this.markerTypeHex = "FFE1";
+            this.markerType = parseInt("0x" + this.markerTypeHex);
+            this.tiffHeader = new TiffHeader();
+            this.markerStart = -1;
+            this.markerEnd = -1;
+            this.markerSize = this.computeMarkerSize();
+        }
+    };
+    App1Exif.prototype = {
+        deserialize: function(dataStream, offset) {
+            //this.tiffHeader = new TiffHeader();
+            //this.tiffHeader.deserialize(dataStream, offset);
+            this.tiffHeader = new StreamData(dataStream, offset, this.markerEnd);
+        },
+        computeMarkerSize: function() {
+            var thsize = this.tiffHeader.computeSize();
+            var size = 2 + 6 + thsize; // 2 bytes for marker size, 6 bytes for exif signature, tiff header size;
+            return size;
+        },
+        serialize: function(dataStream, offset) {
+            var size = this.computeMarkerSize();
+            var dv = new DataView(dataStream, offset, 10);
+            dv.setUint16(0,this.markerType);
+            dv.setUint16(2,size);
+            writeHex(dv, 4, "457869660000");
+            this.tiffHeader.serialize(dataStream, offset + 10);
+            return offset + size + 2;
+        }
+    };
+
+    var App1XMP = function(marker) {
         if (marker) {
             this.markerStart = marker.markerStart;
             this.markerType = marker.markerType;
@@ -112,10 +214,46 @@ denominator.
             this.markerSize = marker.markerSize;
             this.markerEnd = marker.markerEnd;
             this.deserialize(marker.deserializeDS, this.markerStart + 4);
+        } else {
+            this.markerTypeHex = "FFE1";
+            this.markerType = parseInt("0x" + this.markerTypeHex);
+            this.tiffHeader = new TiffHeader();
+            this.markerStart = -1;
+            this.markerEnd = -1;
+            this.markerSize = this.computeMarkerSize();
         }
+    };
+    
+    App1XMP.prototype = {
+        computeMarkerSize: function() {
+            return this.markerSize;
+        },
+        deserialize: function(dataStream, offset) {
+            this.data = new StreamData(dataStream, offset + 4, this.markerEnd);
+        },
+        serialize: function(dataStream, offset) {
+            var size = this.computeMarkerSize();
+            var dv = new DataView(dataStream, offset, size +2);
+            dv.setUint16(this.markerType);
+            dv.setUint16(size);
+            this.data.serialize(dataStream, offset +4);
+            return offset + size +2;
+        }
+    }
+
+    var App1 = function(marker) {
+        this.markerStart = marker.markerStart;
+        this.markerType = marker.markerType;
+        this.markerTypeHex = marker.markerTypeHex;
+        this.markerSize = marker.markerSize;
+        this.markerEnd = marker.markerEnd;
+        //this.deserialize(marker.deserializeDS, this.markerStart + 4);
+        this.marker = marker;
     };
     App1.prototype= {
         deserialize: function(dataStream, offset) {
+            
+            
             var dv = new DataView(dataStream, offset, 6);
             var header = dumpHex(dv, 6);
             if (header === "457869660000") {
@@ -155,19 +293,6 @@ denominator.
             }
 
         }, 
-        parseTiffHeader : function(dataStream) {
-            var dv = new DataView(dataStream, this.startOfTiffHeader, 8); // start of tiff header. not start of file !
-            var byteOrder = decodeString(dv, 0, 2);
-            if (byteOrder === "MM") {
-                this.le = false;
-            } else if (byteOrder === "II") {
-                this.le = true;
-            } else {
-                throw "cannot detect endianess";
-            }
-            if (dv.getUint16(2,this.le) !== 42) throw "cannot find 42";
-            this.idf0OffsetFromTiffH = dv.getUint32(4, this.le); // start idf0 + start tiff header
-        },
         serialize: function(dataStream, offset) {
             var size = this.computeMarkerSize();
             var dv = new DataView(dataStream, offset, 4);
@@ -180,6 +305,27 @@ denominator.
                 var dv = new DataView(dataStream, offset, 6);
                 writeHex(dv, 0, "687474703A2F");                
             }            
+        },
+        detectType: function() {
+            var dataStream = this.marker.deserializeDS;
+            var offset = this.marker.markerStart;
+            var dv = new DataView(dataStream, offset+ 4, 6);
+            var header = dumpHex(dv, 6);
+            console.log(header);
+            var App1Marker;
+            if (header === "457869660000") { // EXIF
+                App1Marker = new App1Exif(this);
+                App1Marker.deserialize(dataStream, offset);
+                console.log("EXIF !!!!");
+            } else if (header === "687474703A2F") {
+                App1Marker = new App1XMP(this);                
+                App1Marker.deserialize(dataStream, offset);
+                console.log("XMP !!!!");
+            } else {                
+                App1Marker = this.marker;
+                console.log("UNKNOWN !!!");
+            }
+            return App1Marker;
         }
     };
     
@@ -375,6 +521,9 @@ denominator.
         
     };
     StreamData.prototype = {
+        computeSize: function() {
+            return this.end - this.start;
+        },
         serialize: function(dataStream, offset) {
             var dvOut = new DataView(dataStream, offset, this.end - this.start);
             var dvIn = new DataView(this.dataStream, this.start, this.end - this.start);
@@ -409,8 +558,9 @@ denominator.
             offset = marker.markerEnd;
             if (marker.markerTypeHex === "FFE1") {
                 var app1 = new App1(marker);
-                this.markers.push(marker);
-                //this.markers.push(app1);
+                app1 = app1.detectType()
+                //this.markers.push(marker);
+                this.markers.push(app1);
             } else {
                 this.markers.push(marker);
             }                        
