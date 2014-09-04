@@ -65,12 +65,16 @@ denominator.
         var out = "";
         for (var i =start; i<start+length ; i++) {
             var v = dv.getInt8(i);
-            //console.log(v);
-            //console.log(String.fromCharCode(v));
-            //console.log(dec2hex(v));
             out += String.fromCharCode(dv.getInt8(i));  
         }
         return out;
+    };
+    writeString = function(dv, start, stringValue) {
+        
+        for (var i =0; i<stringValue.length ; i++) {
+            dv.setInt8(start + i, stringValue.charCodeAt(i));
+        }
+        return start + i;
     };
     
     var tagsLut = tagBuilder;
@@ -120,50 +124,100 @@ denominator.
             }
             if (dv.getUint16(2,this.le) !== 42) throw "cannot find 42";
             this.idf0OffsetFromTiffH = dv.getUint32(4, this.le); // start idf0 + start tiff header
-            /*
-            this.ifd0 = new Ifd();
-
-            this.ifd0.name = "IFD0";
-            this.ifd0.deserialize(dataStream, this.idf0OffsetFromTiffH, this.startOfTiffHeader + this.idf0OffsetFromTiffH);                
+            this.IFD0 = new Ifd();
+            this.IFD0.deserialize(dataStream, this.idf0OffsetFromTiffH, offset + this.idf0OffsetFromTiffH);
             var ExifIFDoffset = this.ifd0.getTagByName("ExifOffset");
             if (ExifIFDoffset !== undefined) {
-                var Exifidf0p = new Ifd();
-                Exifidf0p.name = "ExifIFD";
-                Exifidf0p.deserialize(dataStream, ExifIFDoffset.value, ExifIFDoffset.value + this.startOfTiffHeader);
-                console.log(Exifidf0p);
-            }                
-            if (this.ifd0.nextIFDOffset !== 0) {
-                var idf1p = new Ifd();
-                idf1p.name = "IFD1";
-                idf1p.deserialize(dataStream, this.ifd0.nextIFDOffset, this.ifd0.nextIFDOffset + this.startOfTiffHeader);
-                console.log(idf1p);
+                this.exifIFD = new Ifd();
+                this.exifIFD.name = "ExifIFD";
+                this.exifIFD.deserialize(dataStream, ExifIFDoffset.value, ExifIFDoffset.value + offset);
+                console.log(this.exifIFD);
             }
-            var GPSoffset = this.ifd0.getTagByName("GPSInfo");
+            if (this.IFD0.nextIFDOffset !== 0) {
+                this.IFD1 = new Ifd();
+                this.IFD1.name = "IFD1";
+                this.IFD1.deserialize(dataStream, this.IFD0.nextIFDOffset, this.IFD0.nextIFDOffset + offset);
+                console.log(this.IFD1);
+            }
+            var GPSoffset = this.IFD0.getTagByName("GPSInfo");
             if (GPSoffset !== undefined) {
-                var GPSp = new Ifd();
-                GPSp.name = "GPS";
-                GPSp.deserialize(dataStream, GPSoffset.value, GPSoffset.value + this.startOfTiffHeader);
+                this.GPS = new Ifd();
+                this.GPS.name = "GPS";
+                this.GPS.deserialize(dataStream, GPSoffset.value, GPSoffset.value + offset);
                 console.log(GPSp);
             }
-            */
-
+        },
+        computeSize: function() {
+            var size = 8;
+            if (this.GPS) {
+                this.GPSSize = this.GPS.computeSize();
+                this.IFD0.setTagHex("8825", 0);
+                size += this.GPSSize;
+            }
+            if (this.IFD1) {
+                this.IFD1Size = this.IFD1.computeSize();
+                size += this.IFD1Size;
+            }
+            this.IFD0Size = this.IFD0.computeSize();
+            this.exifIFDSize = this.exifIFD.computeSize();
+            size += (this.IFD0Size + this.exifIFDSize);
+            return size;
         },
         serialize: function(dataStream, offset) {
-            var dv = new DataView(dataStream, offset, 8);
+            // first check if we have an ifd or GPS
+            // if GPS, compute it's size.
+            // if IFD1, compute it's size.
+            // Compute ExifIFD size
+            // if GPS, add GPS tag to IFD0
+            // Compute IFD0 size
+            // 
+            // 
+            // let's decide an order. Say, IFD0, EXIFIFD, GPS first, IFD1
+            // compute EXIFIFD offset
+            // compute GPS Offset
+            // compute IFD1 Offset
+            // write EXIFIFD, GPS and IFD1 OFFSET in IFD0
+            // serialize IFD0 than EXIFIFD than GPS than IFD1
+            if (this.GPS) {
+                this.GPSSize = this.GPS.computeSize();
+                this.IFD0.setTagHex("8825", 0);
+            }
+            if (this.IFD1) {
+                this.IFD1Size = this.IFD1.computeSize();
+            }
+            this.IFD0Size = this.IFD0.computeSize();
+            this.exifIFDSize = this.exifIFD.computeSize();
+            this.exifIFDOffset = this.IFD0Size + 8;
+            this.exifIFD.setTagHex("8769", this.exifIFDOffset);
+            var nextOffset = this.exifIFDOffset + this.exifIFDSize;
+            if (this.GPS) {
+                this.gpsOffset = nextOffset;
+                this.IFD0.setTagHex("8825", this.gpsOffset);
+                nextOffset += this.GPSSize;
+            }
+            if (this.IFD1) {
+                this.IFD1Offset = nextOffset;
+                this.IFD0.nextIFDOffset = this.IFD1Offset;
+            }
+            
+            var dv = new DataView(dataStream, offset, 8); //endianness 2 + magic number 2 + offset to 0thIFD: 4
             if (this.le) {
                 writeHex(dv, 0, "4D4D");
             } else {
-                writeHex(dv, 0, "4D4D");
+                writeHex(dv, 0, "4949");
             }
             dv.setUint16(2, 42, this.le);
-            for (var i=0; i < this.ifds.length; i++) {
-                var size = this.ifds[i].computeSize();
-                this.ifds.serialize();
-                offset += size;
+            dv.setUint32(4, 8, this.le);
+            var pos = offset + 8;
+            this.IFD0.serialize(dataStream, pos);
+            this.exifIFD.serialize(dataStream, pos + this.exifIFDOffset);
+            if (this.GPS) {
+                this.GPS.serialize(dataStream, pos + this.gpsOffset);
             }
-            return offset;
+            if (this.IFD1) {
+                this.IFD1.serialize(dataStream, pos + this.IFD1Offset);
+            }
         },
-        
     };
 
 
@@ -186,9 +240,9 @@ denominator.
     };
     App1Exif.prototype = {
         deserialize: function(dataStream, offset) {
-            //this.tiffHeader = new TiffHeader();
-            //this.tiffHeader.deserialize(dataStream, offset);
-            this.tiffHeader = new StreamData(dataStream, offset, this.markerEnd);
+            this.tiffHeader = new TiffHeader();
+            this.tiffHeader.deserialize(dataStream, offset);
+            //this.tiffHeader = new StreamData(dataStream, offset, this.markerEnd);
         },
         computeMarkerSize: function() {
             var thsize = this.tiffHeader.computeSize();
@@ -229,14 +283,23 @@ denominator.
             return this.markerSize;
         },
         deserialize: function(dataStream, offset) {
-            this.data = new StreamData(dataStream, offset + 4, this.markerEnd);
+            var dv = new DataView(dataStream, offset, 29);
+            this.uri = decodeString(dv, 0, 29);
+            var pos = offset + 29;
+            var l = this.markerEnd - pos;
+            dv = new DataView(dataStream, pos, l);
+            
+            this.xml = decodeString(dv, 0, l);
+            //this.data = new StreamData(dataStream, offset + 4, this.markerEnd);
         },
         serialize: function(dataStream, offset) {
             var size = this.computeMarkerSize();
             var dv = new DataView(dataStream, offset, size +2);
-            dv.setUint16(this.markerType);
-            dv.setUint16(size);
-            this.data.serialize(dataStream, offset +4);
+            dv.setUint16(0, this.markerType);
+            dv.setUint16(2, size);
+            writeString(dv, 4, this.uri);
+            writeString(dv, 4 + 29, this.xml);
+            //this.data.serialize(dataStream, offset +4);
             return offset + size +2;
         }
     }
@@ -314,12 +377,12 @@ denominator.
             console.log(header);
             var App1Marker;
             if (header === "457869660000") { // EXIF
-                App1Marker = new App1Exif(this);
-                App1Marker.deserialize(dataStream, offset);
+                App1Marker = new App1Exif(this.marker);
+                //App1Marker.deserialize(dataStream, offset);
                 console.log("EXIF !!!!");
             } else if (header === "687474703A2F") {
-                App1Marker = new App1XMP(this);                
-                App1Marker.deserialize(dataStream, offset);
+                App1Marker = new App1XMP(this.marker);                
+                //App1Marker.deserialize(dataStream, offset);
                 console.log("XMP !!!!");
             } else {                
                 App1Marker = this.marker;
@@ -503,8 +566,7 @@ denominator.
                         this.value = payloadDV[this.tagType.func](payloadOffset, this.le);
                         if (this.info.values[this.value]) {
                             this.rawValue = this.info.values[this.value];
-                        }
-                        
+                        }   
                     }
                 }
                 this.fullDeserialized = true;
@@ -597,7 +659,8 @@ denominator.
             
             dv.setUint16(0, 65497); //EOI
             
-            return _arrayBufferToBase64(dataStream);
+            //return _arrayBufferToBase64(dataStream);
+            return dataStream;
         }
     
     };

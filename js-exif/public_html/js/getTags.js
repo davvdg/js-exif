@@ -21,14 +21,18 @@ requirejs(["js-exif"], function(t) {
         console.log(event.target.url);
         console.log(event.target.response.byteLength);
         var j = new t(ar);
+        /*
         var f = j.save();
+        var blob = new Blob([f]);
+        var url = window.webkitURL.createObjectURL(blob);
         var bb = "data:application/octet-stream;base64,"
         var pom = document.createElement('a');
-        pom.setAttribute('href', bb+f);
+        pom.setAttribute('href', url);
         var filename = "reset.jpg";
             
         pom.setAttribute('download', filename);
         pom.click();
+        */
         
         
     };
@@ -43,13 +47,13 @@ requirejs(["js-exif"], function(t) {
     xhr2.url = "vosges_xmp";
     xhr2.responseType = "arraybuffer";    
     xhr2.addEventListener("load", onload);
-    //xhr2.send();    
+    xhr2.send();    
     var xhr3 = new XMLHttpRequest();
     xhr3.open("GET", "ressources/iTownsPic_Xlamb93598558.623568116_Ylam936320653.95836461_alt3063.346476212426.jpg", true);
     xhr3.url = "iTownsPix";
     
     xhr3.responseType = "arraybuffer";    
     xhr3.addEventListener("load", onload);
-    //xhr3.send();    
+    xhr3.send();    
     
 });
