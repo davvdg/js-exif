@@ -94,6 +94,7 @@ define([], function() {
                     values: values
                 };
                 ifdn.tags.push(tag);
+                tags.push(tag);
                 //console.log(tag);
             }
         }
@@ -124,6 +125,7 @@ define([], function() {
             values: values
         };
         ifdn.tags.push(tag);
+        tags.push(tag);
     };
     
     

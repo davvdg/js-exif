@@ -21,7 +21,7 @@ requirejs(["js-exif"], function(t) {
         console.log(event.target.url);
         console.log(event.target.response.byteLength);
         var j = new t(ar);
-        /*
+        
         var f = j.save();
         var blob = new Blob([f]);
         var url = window.webkitURL.createObjectURL(blob);
@@ -32,7 +32,7 @@ requirejs(["js-exif"], function(t) {
             
         pom.setAttribute('download', filename);
         pom.click();
-        */
+        
         
         
     };
