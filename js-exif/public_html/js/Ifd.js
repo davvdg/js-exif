@@ -1,9 +1,13 @@
 
 
 define(["utils", "Tag"], function(utils, Tag) {
+    
+
+    
     var Ifd = function(name) {
         this.tags = [];
         if (name) {this.name = name;}
+        this.nextIFDOffset = 0;
     };
     
     Ifd.prototype = {
@@ -15,37 +19,58 @@ define(["utils", "Tag"], function(utils, Tag) {
           }
           return undefined;
       },
-      setTagByHex : function(hex, value) {
+      setTagByHex : function(hex, value, type) {
           var id = parseInt("0x" + hex);
           for (var i=0; i < this.tags.length; i++) {              
               if (this.tags[i].tagId === id) {
                   this.tags[i].setValue(value);
-                  return true;
+                  return  this.tags[i];
               }
           }
           // tag not found
           var tag = new Tag();
+          tag.setTagTypeByName(type);
           tag.container = this;
-          tag.loadDefinition(id);
+          tag.tagId = id;
+          tag.loadDefinition();
           tag.setValue(value);
           this.tags.push(tag);
-          return true;
+          return tag;
       },
-      serialize: function(dataStream, offset) {
+      serialize: function(dataStream, offsetFromTiffStart, offsetFromSoi) {
+          console.log("serializing " + this.tags.length + " tags starting at from start " + offsetFromSoi + " and from tiff header : " + offsetFromTiffStart); 
           var interopSize = 2;
           var payloadSize = this.computePayloadSize();
           var tagSize = this.tags.length * 12;
+          console.log("interop tags size: " + tagSize + " payload size " + payloadSize);
           var nextOffsetSize = 2;
-          var dv = new DataView(dataStream, offset, payloadSize + tagSize + nextOffsetSize + interopSize);
+          
+          var ifdInteropSize = 2 + this.tags.length * 12 + 2;
+          
+          var dv = new DataView(dataStream, offsetFromSoi, payloadSize + tagSize + nextOffsetSize + interopSize);
+          console.log("dvSize:" +  (payloadSize + tagSize + nextOffsetSize + interopSize));
           this._wTagCount(dv);
           var i;
+          var tagPlOffset = offsetFromTiffStart + ifdInteropSize;
           for (i=0; i<this.tags.length; i++) {
-              this.tags[i].writeTagInterop(dv, i*12 + interopSize);
+              var plSize = this.tags[i].getPayloadSize();
+              if (plSize > 4) {
+                  this.tags[i].payloadOffset = tagPlOffset;
+                  tagPlOffset += plSize;
+              }
+              this.tags[i].serializeInterop(dv, i*12 + interopSize);
           }
-          dv.setUint16(this.tags.length * 12 + interopSize, this.nextIFDOffset);
-          var payloadStart = (i+1)*12 +interopSize + nextOffsetSize;
+          console.log("----------tagPlOffset " + tagPlOffset);
+          dv.setUint16(this.tags.length * 12 + interopSize, this.nextIFDOffset);          
+          console.log("next IFD is " + this.nextIFDOffset);
+          var payloadStart = tagSize +interopSize + nextOffsetSize;
+          //console.log(payloadStart);
+          var payloadOffset = 0;
           for (i=0; i<this.tags.length; i++) {
-              var plsize  = this.tags[i].writePayload(dv, payloadStart);
+              
+              var plsize  = this.tags[i].getPayloadSize();
+              //console.log(plsize);
+              this.tags[i].serializePayload(dv, payloadStart); // payload start is start from tiff header
               payloadStart += plsize;
           }          
           
@@ -60,6 +85,7 @@ define(["utils", "Tag"], function(utils, Tag) {
           console.log(tagCount);
           var nextIFDOffsetSize = 2;
           dv = new DataView(dataStream, offset+interopSize, tagCount * 12 + nextIFDOffsetSize);
+          console.log(utils.dumpHex(dv, 0, tagCount * 12 + nextIFDOffsetSize));
           var plSize = 0;
           var i;          
           for (i = 0; i< tagCount; i++) {
@@ -114,6 +140,31 @@ define(["utils", "Tag"], function(utils, Tag) {
           size += this.computePayloadSize();
           return size;
       }
+    }; 
+    var Ifd0 = function() {
+        Ifd.call(this, "IFD0");
+        this.setTagByHex("011A", [96.0], "RATIONAL");
+        this.setTagByHex("011B", [96.0], "RATIONAL");
+        this.setTagByHex("0128", ["inches"], "SHORT");
+        this.setTagByHex("0213", ["Centered"], "SHORT");
+    };
+    
+    Ifd0.prototype = Object.create(Ifd.prototype);    
+
+    var ExifIfd = function() {
+        Ifd.call(this, "ExifIFD");
+        this.setTagByHex("9000", ["30","32","32","31"],"UNDEFINED"); // exif version
+        this.setTagByHex("9101", ["-", "Y", "-", "Cb", "-", "Cr", "-", "-"],"UNDEFINED"); // componentConf 
+        this.setTagByHex("A000", ["30","31","30","30"],"UNDEFINED"); // flashpix
+        this.setTagByHex("A001", ["sRGB"],"SHORT"); // colorspace
+        this.setTagByHex("A002", [800],"SHORT"); // pixelXDimension
+        this.setTagByHex("A003", [800],"SHORT"); // pixelYDimension
+    };
+    
+    ExifIfd.prototype = Object.create(Ifd.prototype);    
+    return {
+        Ifd:Ifd,
+        Ifd0: Ifd0,
+        ExifIfd: ExifIfd
     };    
-    return Ifd;
 });

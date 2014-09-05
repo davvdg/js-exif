@@ -189,7 +189,7 @@ define([], function() {
                 for (var i =0; i< xpvalsres.snapshotLength; i++) {
                     var val = xpvalsres.snapshotItem(i).nodeValue.split("=");
                     if (val[0] !== undefined && val[1] !== undefined) {
-                        val[0] = parseInt(val[0] );
+                        val[0] = parseInt(val[0]);
                         values[val[0]]=val[1].replace("\n", '').trim();
                     }
                 }
@@ -211,10 +211,10 @@ define([], function() {
                 var key = xpExtraRes.snapshotItem(i).childNodes[0].textContent.trimRight();
                 if (key.match(re)!==null) {
                     key = parseInt(key);
-                                    console.log(key);
+                    console.log(key);
 
                 }
-                
+                key = parseInt(key);
                 var val = xpExtraRes.snapshotItem(i).childNodes[1].textContent;
                 values[key] = val.replace("= ", '');
             }

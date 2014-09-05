@@ -68,8 +68,10 @@ define([], function() {
     
     function writeHex(dv, offset, hexString) {
         var l = hexString.length;
-        for (var i =0; i<0+l/2 ; i++) {
-            dv.setUint8(offset + i, parseInt("0x" + hexString.slice(i,i+2)));
+        for (var i =0;i< l; i+=2) {
+            //console.log((parseInt("0x" + hexString.slice(i,i+2))));
+            //console.log(hexString.slice(i,i+2));
+            dv.setUint8(offset + (i/2), parseInt("0x" + hexString.slice(i,i+2)));
         }
     }    
 
