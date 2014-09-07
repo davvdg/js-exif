@@ -1,6 +1,6 @@
 
 
-define(["tagBuilder", "utils"], function(tagBuilder, utils) {
+define(["json!tagLookup.json", "utils"], function(tagBuilder, utils) {
     var exifDataTypes = {
             1:{type: "BYTE",        func: "getUint8", funcr:"setUint8", l:1, v:1}, 
             2:{type: "ASCII",       func: "getUint8", funcr:"setUint8", l:1, v:2},
@@ -28,7 +28,9 @@ define(["tagBuilder", "utils"], function(tagBuilder, utils) {
     var Tag = function() {
         this.le = false;
         this.rawValue = [];
-        
+        this.value = [];
+        this.fullyDeserialized = true;
+        this.tagCount = 0;
     };
     Tag.prototype= {
         setTagTypeByName: function(value) {
@@ -93,44 +95,60 @@ define(["tagBuilder", "utils"], function(tagBuilder, utils) {
                     
                 }                
             }
-            this.tagCount = value.length;
+            if (this.tagType.type === "ASCII") {
+                this.tagCount = value.length + 1;
+            } else {
+                this.tagCount = value.length;
+            }
             this.value = value;
         },
         computePayloadSize: function() {
             var plSize = 0;
             if (this.tagType.type ==="ASCII") {
-                plSize = this.value.length;
+                plSize = this.value.length +1;
+                this.tagCount = this.value.length + 1;
             } else {
                 plSize = this.tagCount * this.tagType.l;
+                this.tagCount = this.value.length;
             }
             return plSize;
         },
         getPayloadSize: function() {
             if (this.fullyDeserialized) {
-                return this.computePayloadSize();
-            } else {
-                var plSize = this.tagCount * this.tagType.l;
-                if (plSize > 4) {
-                    this.plSize = plSize;
-                    return this.plSize;
+                if (this.tagType.type === "ASCII") {
+                    this.tagCount = this.value.length +1;
+                } else {
+                    this.tagCount = this.value.length;
+                    console.log(this.value);
+                                        console.log(this.tagCount);
+
                 }
-                this.plSize = 0;
-                return this.plSize;
+                console.log("forced tag size");
+            }
+            console.log(this.tagCount);
+            var size = this.tagCount * this.tagType.l;
+            if (size <=4) {
+                return 0;
+            } else {
+                console.log("tag "+ this.tagId + " size " + size);
+                return size;
             }
         },
         deserializeInterop: function(ifdInteropDV, dvOffset) {
             
             this.fullyDeserialized = false;
+            this.deserializing = true;
             this.tagId =    ifdInteropDV.getUint16(dvOffset, this.le);
             
             // lookup tags in dictionary
-            console.log(this.tagId);
+            //console.log(this.tagId);
             this.loadDefinition();
             //console.log(this);
             //
             this.tagType =  exifDataTypes[ifdInteropDV.getUint16(dvOffset + 2, this.le)];
             this.tagSize =  this.tagType.l;
             this.tagCount = ifdInteropDV.getUint32(dvOffset + 4, this.le);
+            console.log("tag ele count" + this.tagCount);
             var plSize = this.getPayloadSize();
             if (plSize === 0) {
                 this.payloadOffset = -1;
@@ -141,11 +159,12 @@ define(["tagBuilder", "utils"], function(tagBuilder, utils) {
             
         },
         deserializePayload: function(payloadDV, payloadOffset) {
-            if (!this.fullyDeserialized) {
+            if (this.fullyDeserialized === false) {
                 if (this.tagType.type === "UNDEFINED") {
                     this.value = [utils.dumpHex(payloadDV, payloadOffset, this.tagCount)];
                 } else if (this.tagType.type === "ASCII") {
                     this.value = utils.decodeString(payloadDV, payloadOffset, this.tagCount);
+                    
                 } else {
                     this.value = [];
                     this.rawValue = [];
@@ -160,25 +179,33 @@ define(["tagBuilder", "utils"], function(tagBuilder, utils) {
                                 this.value.push(this.info.values[value]);
                                 this.rawValue.push(value);
                             } else {
-                                console.log("no lookup found for " + value);
+                                //console.log("no lookup found for " + value);
                                 this.value.push(value);
                             }
                         }
                     }
                 }
                 this.fullyDeserialized = true;
-            }            
+            } else {
+                console.log("already deserialize");
+            }
+            this.deserializing = false;
         },
         serializeInterop: function(ifdInteropDV, offset) {
-            console.log(this.tagDesc + " size " + this.tagCount * this.tagType.l);
+            if (this.tagType.type === "ASCII") {
+                this.tagCount = this.value.length +1;
+            } else {
+                this.tagCount = this.value.length;
+            }
+            //console.log(this.tagDesc + " size " + this.tagCount * this.tagType.l);
             this.fullySerialized = false;
             ifdInteropDV.setUint16(offset, this.tagId, this.le);
             ifdInteropDV.setUint16(offset + 2, this.tagType.v, this.le);
-            var count = this.value.length;
-            console.log(count);
-            console.log(this.value);            
-            ifdInteropDV.setUint32(offset + 4, count, this.le);
-            if ((count * this.tagType.l) <=4) {
+            //console.log(this.tagCount);
+            //console.log(this.value);            
+            ifdInteropDV.setUint32(offset + 4, this.tagCount, this.le);
+            if ((this.tagCount * this.tagType.l) <=4) {
+                
                 this.serializePayload(ifdInteropDV, offset +8);
                 this.fullySerialized = true;
             } else {
@@ -187,14 +214,13 @@ define(["tagBuilder", "utils"], function(tagBuilder, utils) {
         },
         serializePayload: function(ifdPayloadDV, offset) {
             var o = offset;
-            console.log("payload of " + this.tagDesc);
+            //console.log("payload of " + this.tagDesc);
             if (!this.fullySerialized) {
                 if (this.tagType.type === "ASCII") {
-                    return utils.writeString(ifdPayloadDV, offset, this.value);                     
+                    return utils.writeString(ifdPayloadDV, offset, this.value)+1;                     
                 } else {
                     for (var i=0; i < this.value.length; i++) {                        
                         if (this.tagType.type === "RATIONAL" || this.tagType.type === "SRATIONAL") {
-                            console.log("offset: " + offset);
                             var frac = utils.fraction(this.value[i]);
                             ifdPayloadDV[this.tagType.funcr](offset, frac[0]);
                             ifdPayloadDV[this.tagType.funcr](offset +4, frac[1]);
@@ -215,7 +241,7 @@ define(["tagBuilder", "utils"], function(tagBuilder, utils) {
                         offset += this.tagType.l;
                     }
                 }
-                console.log("payload:" +  utils.dumpHex(ifdPayloadDV, o, this.tagCount * this.tagType.l));
+                //console.log("payload:" +  utils.dumpHex(ifdPayloadDV, o, this.tagCount * this.tagType.l));
 
                 this.fullySerialized = true;
             }

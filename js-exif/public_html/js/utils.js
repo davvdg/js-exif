@@ -8,7 +8,23 @@ define([], function() {
             if (!(V%=U)) return U;
         } 
     }
+    
+   function fraction(x) {
+    var tolerance = 1.0E-6;
+    var h1=1; var h2=0;
+    var k1=0; var k2=1;
+    var b = x;
+    do {
+        var a = Math.floor(b);
+        var aux = h1; h1 = a*h1+h2; h2 = aux;
+        aux = k1; k1 = a*k1+k2; k2 = aux;
+        b = 1/(b-a);
+    } while (Math.abs(x-h1/k1) > x*tolerance);
+    
+    return [h1, k1];
+}
     //convert a decimal into a fraction (from http://stackoverflow.com/questions/14783869/convert-a-decimal-number-to-a-fraction-rational-number)
+    /*
     function fraction(decimal){
 
         if(!decimal){
@@ -44,11 +60,11 @@ define([], function() {
         }
         //get highest common factor to simplify
         var t = HCF(decimal, num);
-
+        return [decimal, num];
         //return the fraction after simplifying it
         return ((whole===0)?"" : whole+" ")+decimal/t+"/"+num/t;
     }
-    
+    */
     function dec2hex(i, l) {
        if (!l) l=2;
        return (i+0x10000).toString(16).substr(-l).toUpperCase();
@@ -89,6 +105,9 @@ define([], function() {
         var out = "";
         for (var i =start; i<start+length ; i++) {
             var v = dv.getInt8(i);
+            if (v === 0) {
+                return out;
+            }
             out += String.fromCharCode(dv.getInt8(i));  
         }
         return out;
@@ -98,7 +117,8 @@ define([], function() {
         for (var i =0; i<stringValue.length ; i++) {
             dv.setInt8(start + i, stringValue.charCodeAt(i));
         }
-        return start + i;
+        dv.setInt8(start + stringValue.length, 0);
+        return start + stringValue.length + 1;
     };
     
     return {

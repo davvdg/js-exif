@@ -90,7 +90,7 @@ define([], function() {
                     id: node.childNodes[1].textContent, 
                     idn: parseInt(node.childNodes[1].textContent,16),
                     tagName: xpTagNamesRes.snapshotItem(i).nodeValue,
-                    ifd: ifdn,
+                    //ifd: ifdn,
                     values: values
                 };
                 ifdn.tags.push(tag);
@@ -121,7 +121,7 @@ define([], function() {
             id: nodei.childNodes[1].textContent, 
             idn: parseInt(nodei.childNodes[1].textContent,16),
             tagName: xpTagNamesRes.snapshotItem(0).nodeValue,
-            ifd: ifdn,
+            //ifd: ifdn,
             values: values
         };
         ifdn.tags.push(tag);
@@ -197,7 +197,7 @@ define([], function() {
         }
         return values;
         
-    }
+    };
     
     var parseExtraValues = function(node, tableName) {
         var doc = node.ownerDocument;
@@ -241,12 +241,17 @@ define([], function() {
             checkDoc();
         }
         
-    }
+    };
     var checkDoc = function() {
+        console.log(otherRequest);
         if (otherRequest === 0) {
             //console.log(ifds);
+            
+            var data = JSON.stringify({tags:tags, ifds:ifds});
+            var url = 'data:text/json;charset=utf8,' + encodeURIComponent(data);
+            window.open(url, '_blank');
         }
-    }
+    };
     var parseExtraDocs = function(xmli, ifd) {
         var doc = xmli;
         var values = {};

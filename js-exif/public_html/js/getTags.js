@@ -12,7 +12,7 @@ requirejs.config({
     waitSeconds : 0
 });
 
-requirejs(["js-exif"], function(t) {
+requirejs(["js-exif" ], function(t) {
 
 
     
@@ -24,15 +24,24 @@ requirejs(["js-exif"], function(t) {
         console.log("orig file");
         console.log(j.markers);
         
-        ffe0 = j.getMarkersByHex("FFE0");
-        j.markers.shift();
+        var ffe0 = j.getMarkersByHex("FFE0");
+        if (ffe0.length>0) {
+            console.log("found ffe0, stripping")
+            //j.markers.shift();
+        }
         
-        ffe1 = j.getMarkersByHex("FFE1");
-        if (ffe1.length >0) {
-            console.log({}.toString(ffe1));
+        var ffe1 = j.getMarkersByHex("FFE1");
+        if (ffe1.length > 0) {
+            console.log("Found FFE1 marker !");
         } else {
             var a = j.addApp1ExifMarker();
             a.tiffHeader.IFD0.setTagByHex("010f", "iTowns", "ASCII");
+            var gps = a.tiffHeader.addGPSIfd();
+            gps.setTagByHex("0002", [44, 10, 0], "RATIONAL");
+            gps.setTagByHex("0004", [1, 5, 3], "RATIONAL");
+            gps.setTagByHex("0006", [850], "RATIONAL");
+            gps.setTagByHex("000A", "3", "ASCII");
+            gps.setTagByHex("0018", [356], "RATIONAL");
         }
         console.log("edited file");        
         console.log(j.markers);
@@ -66,13 +75,13 @@ requirejs(["js-exif"], function(t) {
     xhr2.url = "vosges_xmp";
     xhr2.responseType = "arraybuffer";    
     xhr2.addEventListener("load", onload);
-    //xhr2.send();    
+    xhr2.send();    
     var xhr3 = new XMLHttpRequest();
     xhr3.open("GET", "ressources/iTownsPic_Xlamb93598558.623568116_Ylam936320653.95836461_alt3063.346476212426.jpg", true);
     xhr3.url = "iTownsPix";
     
     xhr3.responseType = "arraybuffer";    
     xhr3.addEventListener("load", onload);
-    xhr3.send();    
+    //xhr3.send();    
     
 });
