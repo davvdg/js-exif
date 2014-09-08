@@ -35,7 +35,7 @@ define(["utils", "Ifd"], function(utils, Ifd) {
     };
 
     var TiffHeader = function() {
-        this.le = false
+        this.le = false;
         this.IFD0 = new Ifd.Ifd0();
         this.exifIFD = new Ifd.ExifIfd();
         this.IFD0.setTagByHex("8769", [0],"LONG");        
@@ -188,7 +188,7 @@ define(["utils", "Ifd"], function(utils, Ifd) {
             if (this.IFD1) {
                 this.IFD1.serialize(dataStream, offsetFromTiffStart + this.IFD1Offset, posFromSoi + this.IFD1Offset);
             }
-        },
+        }
     };
 
 
@@ -278,7 +278,7 @@ define(["utils", "Ifd"], function(utils, Ifd) {
             //this.data.serialize(dataStream, offset +4);
             return offset + size +2;
         }
-    }
+    };
 
     var App1 = function(marker) {
         this.markerStart = marker.markerStart;
@@ -364,7 +364,7 @@ define(["utils", "Ifd"], function(utils, Ifd) {
             offset = marker.markerEnd;
             if (marker.markerTypeHex === "FFE1") {
                 var app1 = new App1(marker);
-                app1 = app1.detectType()
+                app1 = app1.detectType();
                 //this.markers.push(marker);
                 this.markers.push(app1);
             } else {
