@@ -81,7 +81,7 @@ define(["utils", "Tag"], function(utils, Tag) {
           //console.log(offsetFromSOI);
           this.tags = [];
           var interopSize = 2; 
-          console.log("interop" + offsetFromSOI);
+          console.log("interop " + offsetFromSOI);
           var dv = new DataView(dataStream, offsetFromSOI, interopSize);
           //console.log(utils.dumpHex(dv,0,2));
           var tagCount = this._rTagCount(dv);
@@ -94,6 +94,7 @@ define(["utils", "Tag"], function(utils, Tag) {
           var i;          
           for (i = 0; i< tagCount; i++) {
               var tag = new Tag();
+              tag.le = this.le
               tag.container = this;
               tag.deserializeInterop(dv, i * 12);
               if (tag.payloadOffset>0) {
@@ -105,7 +106,7 @@ define(["utils", "Tag"], function(utils, Tag) {
           plSize -= offsetFromTiffHeader + interopSize + nextIFDOffsetSize + tagCount *12;
           if (plSize < 0)  { plSize = 0};
           console.log("plSize" + plSize);
-          this.nextIFDOffset = dv.getUint32(tagCount *12);
+          this.nextIFDOffset = dv.getUint32(tagCount *12, this.le);
           console.log("payload " + (offsetFromSOI + interopSize + nextIFDOffsetSize + tagCount *12));
 
           dv = new DataView(dataStream, offsetFromSOI + interopSize + nextIFDOffsetSize + tagCount *12, plSize);
@@ -127,11 +128,11 @@ define(["utils", "Tag"], function(utils, Tag) {
           }
       },
       _rTagCount: function(dv) {
-          var tagCount = dv.getUint16(0);
+          var tagCount = dv.getUint16(0, this.le);
           return tagCount;
       },
       _wTagCount: function(dv) {
-          dv.setUint16(0, this.tags.length);
+          dv.setUint16(0, this.tags.length, this.le);
       },
       computePayloadSize: function() {
           var plSize = 0;

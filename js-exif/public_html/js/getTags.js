@@ -45,7 +45,7 @@ requirejs(["js-exif" ], function(t) {
         }
         console.log("edited file");        
         console.log(j.markers);
-
+        /*
         var f = j.save();
         var p = new t(f);
         console.log("saved reparsed pic");
@@ -60,7 +60,7 @@ requirejs(["js-exif" ], function(t) {
             
         pom.setAttribute('download', filename);
         pom.click();
-        
+        */
         
         
     };
@@ -75,13 +75,23 @@ requirejs(["js-exif" ], function(t) {
     xhr2.url = "vosges_xmp";
     xhr2.responseType = "arraybuffer";    
     xhr2.addEventListener("load", onload);
-    xhr2.send();    
+    //xhr2.send();    
     var xhr3 = new XMLHttpRequest();
     xhr3.open("GET", "ressources/iTownsPic_Xlamb93598558.623568116_Ylam936320653.95836461_alt3063.346476212426.jpg", true);
     xhr3.url = "iTownsPix";
     
     xhr3.responseType = "arraybuffer";    
     xhr3.addEventListener("load", onload);
-    //xhr3.send();    
+    //xhr3.send(); 
     
+    var xhr4 = new XMLHttpRequest();
+    xhr4.open("GET", "ressources/P1050516.JPG", true);
+    xhr4.url = "P1050516.JPG";
+    
+    xhr4.responseType = "arraybuffer";    
+    xhr4.addEventListener("load", onload);
+    xhr4.send(); 
+    
+    //xhr3.send();    
+ 
 });

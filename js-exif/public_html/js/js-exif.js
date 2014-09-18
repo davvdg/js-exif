@@ -46,6 +46,7 @@ define(["utils", "Ifd"], function(utils, Ifd) {
         addGPSIfd: function() {
             if (!this.GPS) {
                 this.GPS = new Ifd.Ifd("GPS");
+                this.GPS.le = this.le;
                 this.GPS.setTagByHex("0000", [2,2,0,0], "BYTE");
                 this.GPS.setTagByHex("0001", "N", "ASCII");
                 this.GPS.setTagByHex("0002", [0, 0, 0], "RATIONAL");
@@ -64,9 +65,11 @@ define(["utils", "Ifd"], function(utils, Ifd) {
             var dv = new DataView(dataStream, offset, 8); // 2 + 2 + 4
             var byteOrder = utils.decodeString(dv, 0, 2);
             if (byteOrder === "MM") {
+                console.log("file is big endian");
                 this.le = false;
             } else if (byteOrder === "II") {
                 this.le = true;
+                console.log("file is little endian");
             } else {
                 throw "cannot detect endianess";
             }
@@ -79,12 +82,14 @@ define(["utils", "Ifd"], function(utils, Ifd) {
             console.log("start of IFD0 from SOI " + (this.idf0OffsetFromTiffH + offset ));
 
             this.IFD0 = new Ifd.Ifd("IFD0");
+            this.IFD0.le = this.le;
             this.IFD0.deserialize(dataStream, this.idf0OffsetFromTiffH, offset + this.idf0OffsetFromTiffH);
             //console.log("dist from SOI:" + (offset + this.idf0OffsetFromTiffH + this.IFD0.computeSize()));
             //console.log(this.IFD0);
             var ExifIFDoffset = this.IFD0.getTagByName("ExifOffset");
             if (ExifIFDoffset !== undefined) {
                 this.exifIFD = new Ifd.Ifd("ExifIFD");
+                this.exifIFD.le = this.le;
                 //console.log("begin deserializing Exif from " + (ExifIFDoffset.value[0] + offset ));
                 this.exifIFD.deserialize(dataStream, ExifIFDoffset.value[0], ExifIFDoffset.value[0] + offset);
                 //console.log(this.exifIFD);
@@ -93,6 +98,7 @@ define(["utils", "Ifd"], function(utils, Ifd) {
                 console.log(this.IFD0.nextIFDOffset);
                // console.log("I have an IFD1 to deserialize !!!");
                 this.IFD1 = new Ifd.Ifd("IFD1");
+                this.IFD1.le = this.le;
                 this.IFD1.deserialize(dataStream, this.IFD0.nextIFDOffset, this.IFD0.nextIFDOffset + offset);
                 //console.log(this.IFD1);
             }
@@ -101,6 +107,7 @@ define(["utils", "Ifd"], function(utils, Ifd) {
                 //console.log("I have an GPS to deserialize !!!");
                 //console.log(GPSoffset.value[0]);
                 this.GPS = new Ifd.Ifd("GPS");
+                this.GPS.le = this.le;
                 this.GPS.container = this;
                 //console.log("begin deserializing GPS from " + (GPSoffset.value[0] + offset +this.idf0OffsetFromTiffH ));
 
